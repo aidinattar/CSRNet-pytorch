@@ -3,20 +3,30 @@ import torch
 from torchvision import models
 from utils import save_net,load_net
 
+
 class CSRNet(nn.Module):
     def __init__(self, load_weights=False):
         super(CSRNet, self).__init__()
         self.seen = 0
         self.frontend_feat = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512]
-        self.backend_feat  = [512, 512, 512,256,128,64]
+        self.backend_feat = [512, 512, 512, 256, 128, 64]
         self.frontend = make_layers(self.frontend_feat)
-        self.backend = make_layers(self.backend_feat,in_channels = 512,dilation = True)
+        self.backend = make_layers(self.backend_feat, in_channels=512, dilation=True)
         self.output_layer = nn.Conv2d(64, 1, kernel_size=1)
+
         if not load_weights:
-            mod = models.vgg16(pretrained = True)
+            mod = models.vgg16(pretrained=True)
             self._initialize_weights()
-            for i in xrange(len(self.frontend.state_dict().items())):
-                self.frontend.state_dict().items()[i][1].data[:] = mod.state_dict().items()[i][1].data[:]
+
+            frontend_state_dict = self.frontend.state_dict()
+            mod_state_dict = mod.state_dict()
+
+            # Selectively load matching keys from mod_state_dict to frontend_state_dict
+            frontend_state_dict.update({k: v for k, v in mod_state_dict.items() if k in frontend_state_dict})
+
+            self.frontend.load_state_dict(frontend_state_dict)
+
+
     def forward(self,x):
         x = self.frontend(x)
         x = self.backend(x)
